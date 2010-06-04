@@ -1,0 +1,179 @@
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>An AtomPub Server for MarkLogic Server</title><link rel="stylesheet" type="text/css" href="main.css" /></head><body><div class="article" id="R.1"><div class="article-titlepage"><h2>An AtomPub Server for MarkLogic Server</h2><div class="author"><h3><span class="personname"><span class="firstname">Norman</span> <span class="surname">Walsh</span></span></h3></div></div><div class="toc"><p><b>Table of Contents</b></p><dl class="toc"><dt><span><a href="#manifest">1. What's in the distribution</a></span></dt><dt><span><a href="#how">2. How it works</a></span></dt><dd><dl class="toc"><dt><span><a href="#amps">2.1. Security Considerations</a></span></dt><dt><span><a href="#errhandler">2.2. The Error Handler</a></span></dt><dt><span><a href="#alerting">2.3. Alerting</a></span></dt></dl></dd><dt><span><a href="#install">3. Installing the distribution</a></span></dt><dt><span><a href="#configuration">4. Configuration</a></span></dt><dt><span><a href="#testing">5. Testing the install</a></span></dt></dl></div><p>The <a href="http://www.ietf.org/rfc/rfc5023.txt">Atom
+Publishing Protocol</a> is an application-level protocol for publishing and
+editing entries in an
+<a href="http://www.ietf.org/rfc/rfc4287.txt">Atom Feed</a>.</p><p>The protocol's design centers around sending and receiving XML
+representations of the resources. The Atom protocol server is expected
+to maintain these collections of entries, respond to requests for
+creating, retrieving, and updating them, and manage ancillary XML
+representations that describe the services available to
+clients.</p><p>These are all things that
+<a href="http://www.marklogic.com/product/marklogic-server.html">MarkLogic
+Server</a> was designed to do.</p><p>I decided to see how easy it would be to implement a fully conformant
+Atom Publishing Protocol server in XQuery on top of MarkLogic Server. The answer:
+remarkably easy. The entire implementation of the core server is less than
+2000 lines of XQuery.</p><p>This distribution includes that core implementation plus a very
+tiny weblog application designed to demonstrate how it could be used.
+</p><div class="section" id="manifest"><div class="section-titlepage"><h3>1. What's in the distribution</h3></div><p>The distribution consists of three parts:</p><div class="variablelist"><dl><dt id="manifest.3.1.1">AtomPub</dt><dd><p>This is the code for the core server.</p></dd><dt id="manifest.3.2.1">WebLog</dt><dd><p>This is the code for the toy weblog implementation that
+demonstrates the server.</p></dd><dt id="manifest.3.3.1">doc</dt><dd><p>This documentation.
+</p></dd></dl></div></div><div class="section" id="how"><div class="section-titlepage"><h3>2. How it works</h3></div><p>If you're unclear about how the <em class="citetitle">Atom Publishing
+Protocol</em> works, please read
+<a href="http://www.ietf.org/rfc/rfc5023.txt">the RFC</a>.
+This section assumes that you have at least a passing familiarity with
+AtomPub concepts.</p><p>Fundamentally, AtomPub is a simple protocol for interacting with
+feed entries over HTTP. One of the interesting parts, with respect to
+implementing a server, is dealing with security and authentication.</p><p>The goal is to interact with a Atom feed that publishes entries
+that everyone can read. That means that we can't require authentication
+to read the entries. At the same time, we don't want anyone to be able
+to change the entries. That means that we must require authentication to
+create, update, or delete entries.</p><p>There are many ways that we might accomplish this goal, but the
+<em class="citetitle">Atom Publishing Protocol</em> mandates that we use
+HTTP authentication for this purpose. That is, an AtomPub client will
+expect to connect using standard HTTP authentication mechanisms.</p><p>The rub is that HTTP authentication doesn't distinguish between
+kinds of access. Resource access either requires authentication or it
+does not.</p><p>This means that there's no practical way to simultaneously use
+standard HTTP authentication and allow read access to a resource without
+authentication and write access with authentication.</p><p>Many AtomPub servers address this problem by providing two different
+URIs to interact with the same resource: so
+<tt class="uri">http://example.com/path/to/feed</tt> might provide read access without
+authentication (and no write access at all), while
+<tt class="uri">http://example.com/path/to/feed/edit</tt> might require authentication
+and provide full access to authenticated clients.</p><p>We have to do the same thing. In our case the easiest way to do this
+is to simple have two application servers (running on different ports, of course)
+that access the same database: one supports full access with authentication
+while the other supports only read access without authentication.</p><div class="section" id="amps"><div class="section-titlepage"><h4>2.1. Security Considerations</h4></div><p>In addition to the users and roles created explicitly during
+installation, the WebLog system adds users, roles, and privileges for
+users when they register.</p><p>For each user, <em class="replaceable"><tt class="replaceable">uname</tt></em>, registered,
+the system creates:</p><div class="orderedlist"><ol style="list-style: decimal;"><li><p>A user named <em class="replaceable"><tt class="replaceable">uname</tt></em>.</p></li><li><p>A URI privilege named
+<tt class="literal">weblog-edit-<em class="replaceable"><tt class="replaceable">uname</tt></em></tt>
+</p></li><li><p>A role named
+<tt class="literal">weblog-editor-<em class="replaceable"><tt class="replaceable">uname</tt></em></tt>
+</p></li></ol></div></div><div class="section" id="errhandler"><div class="section-titlepage"><h4>2.2. The Error Handler</h4></div><p>The toy WebLog makes extensive use of the error handler to deal
+with requests for feeds which don't exist at precisely the URIs requested.</p><p>This code predates the addition of a URI rewriting mechanism in
+MarkLogic Server. It's probably worth considering using the rewriter instead
+of the error handler.</p></div><div class="section" id="alerting"><div class="section-titlepage"><h4>2.3. Alerting</h4></div><p>In a real WebLog, you might want to associate alerts with PUT
+and POST events. Example code for accomplishing this is present (but
+commented out) in <tt class="filename">/AtomPub/put.xqy</tt> and
+<tt class="filename">/AtomPub/post.xqy</tt>.
+</p></div></div><div class="section" id="install"><div class="section-titlepage"><h3>3. Installing the distribution</h3></div><p>The following steps describe how to install and configure the
+AtomPub server and the WebLog server. These instructions were designed
+to be simple and straightforward, along the way we'll point out where
+it might be useful to proceed with more care if you're deploying into
+a production environment.</p><div class="orderedlist"><ol style="list-style: decimal;"><li><p>Copy the <tt class="filename">AtomPub</tt> directory to
+<tt class="filename">/opt/MarkLogic/Modules/</tt> (or wherever the modules
+directory is on your system).</p><div class="note admonition"><h3>Note</h3><p>I wanted to make it possible for the WebLog application to
+create new accounts automatically. Even in the testing phase, I didn't
+really want to have to manually create users.
+</p><p>But that introduces the circular problem of allowing
+non-authenticated users to do something that's effectively an update
+to the database.</p><p>The solution is to “amp” selected functions. For more
+information, see <em class="citetitle">19.0 Security Administration</em>
+in the <em class="citetitle">MarkLogic Server Administrator's
+Guide</em>.</p></div><p>It's not possible to “amp” code that's
+run from the filesystem, so you must put the AtomPub modules in the
+servers module directory or in a a modules database.
+</p></li><li><p>Create roles. The system uses three roles: <tt class="literal">weblog-reader</tt>,
+<tt class="literal">weblog-editor</tt>, and <tt class="literal">weblog-admin</tt>. These
+roles exist mostly with an eye towards future extension, there isn't that
+much difference between them today.
+</p><p>The <tt class="literal">weblog-reader</tt> must have the following
+execute privileges: <tt class="literal">unprotected-collections</tt>,
+<tt class="literal">xdmp:add-response-header</tt>, and
+<tt class="literal">xdmp:invoke</tt>. It must also have the
+<tt class="literal">filesystem-access (read)</tt> capability.</p><p>The <tt class="literal">weblog-editor</tt> must inherit the
+<tt class="literal">weblog-reader</tt> role.</p><p>The <tt class="literal">weblog-admin</tt> must inherit the
+<tt class="literal">weblog-reader</tt> role and have the
+<tt class="literal">unprotected-uri</tt> execute privilege.
+</p></li><li><p>Create users. You need to create two users, the rest will be created
+automatically.</p><p>Create <tt class="literal">joepublic</tt> with the
+<tt class="literal">weblog-reader</tt> role. This is the
+user that will be used to access the unauthenticated, “read only”
+server.</p><p>Create <tt class="literal">weblog-admin</tt> with the
+<tt class="literal">weblog-admin</tt> role.</p></li><li><p>Create a “<tt class="literal">weblog</tt>” forest and
+“<tt class="literal">weblog</tt>” database to hold the
+feeds.</p></li><li><p>Create the public appserver on port 8600.</p><p>Specify the “<tt class="literal">atompub</tt>” database as the
+database, the location where you installed the
+“<tt class="filename">WebLog</tt>” directory as the root, use
+“<tt class="literal">application-level</tt>” authentication with
+“<tt class="literal">joepublic</tt> as the default user.
+Specify <tt class="filename">/error-handler.xqy</tt> as the error
+handler.</p></li><li><p>Create the authenticated appserver on port 8601.</p><p>Specify the “<tt class="literal">atompub</tt>” database as the
+database, the location where you installed the
+“<tt class="filename">WebLog</tt>” directory as the root, use
+“<tt class="literal">basic</tt>” authentication (or any scheme that your
+client supports) with
+“<tt class="literal">nobody</tt> as the default user.
+Specify <tt class="filename">/error-handler.xqy</tt> as the error
+handler.</p></li><li><p>Create two “amps”, one for <tt class="function">create-putative-user</tt>
+and one for <tt class="function">create-user</tt>. Both are in the
+<tt class="uri">http://www.marklogic.com/modules/atompub/admin</tt> namespace
+and have the document uri <tt class="uri">/AtomPub/admin.xqy</tt>.
+</p><p>For convenience, just give them the “<tt class="literal">admin</tt>”
+role. It would be possible to give them something more constrained in
+production, but this is the easiest thing to do for testing.</p></li><li><p>Initialize the database with global configuration information.
+</p><p>If you deviated from the instructions above, used different user names
+or different ports, for example, then make sure you edit
+<tt class="filename">/WebLog/setup/load-config.xqy</tt> before you run it!</p><p>When you're ready, log into the web server as
+<tt class="literal">weblog-admin</tt> and run
+<tt class="uri">/setup/load-config.xqy</tt>. This will setup some default
+values.</p></li></ol></div></div><div class="section" id="configuration"><div class="section-titlepage"><h3>4. Configuration</h3></div><p>Global configuration information for the repository is stored in
+<tt class="uri">/etc/configuration.xml</tt>. Here's what the default looks like:</p><div class="programlisting"><pre><span class="linenumber">  1</span><span class="linenumber-separator"> </span>
+<span class="linenumber">  2</span><span class="linenumber-separator"> </span>&lt;configuration xmlns="http://www.marklogic.com/ns/atompub"
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>               xmlns:app="http://www.w3.org/2007/app"
+<span class="linenumber">  4</span><span class="linenumber-separator"> </span>   	    xmlns:atom="http://www.w3.org/2005/Atom"&gt;
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>  &lt;root&gt;http://localhost:8600&lt;/root&gt;
+<span class="linenumber">  6</span><span class="linenumber-separator"> </span>  &lt;edit-root&gt;http://localhost:8601&lt;/edit-root&gt;
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>  &lt;generator&gt;Mark Logic AtomPub V0.0.3&lt;/generator&gt;
+<span class="linenumber">  8</span><span class="linenumber-separator"> </span>  &lt;module method="post"&gt;/AtomPub/post.xqy&lt;/module&gt;
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>  &lt;module method="put"&gt;/AtomPub/put.xqy&lt;/module&gt;
+<span class="linenumber"> 10</span><span class="linenumber-separator"> </span>  &lt;module method="validate"&gt;/AtomPub/validate.xqy&lt;/module&gt;
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>  &lt;module method="format"&gt;/AtomPub/format.xqy&lt;/module&gt;
+<span class="linenumber"> 12</span><span class="linenumber-separator"> </span>  &lt;weblog-reader&gt;joepublic&lt;/weblog-reader&gt;
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>  &lt;weblog-path&gt;/u/&lt;/weblog-path&gt;
+<span class="linenumber"> 14</span><span class="linenumber-separator"> </span>
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>  &lt;reserved userid="admin"/&gt;
+<span class="linenumber"> 16</span><span class="linenumber-separator"> </span>  &lt;reserved userid="weblog-admin"/&gt;
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>
+<span class="linenumber"> 18</span><span class="linenumber-separator"> </span>  &lt;user userid="ndw"&gt;
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>    &lt;email&gt;ndw@nwalsh.com&lt;/email&gt;
+<span class="linenumber"> 20</span><span class="linenumber-separator"> </span>    &lt;title&gt;Test Weblog&lt;/title&gt;
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>  &lt;/user&gt;
+<span class="linenumber"> 22</span><span class="linenumber-separator"> </span>
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>  &lt;putative-user userid="newuser"&gt;
+<span class="linenumber"> 24</span><span class="linenumber-separator"> </span>    &lt;username&gt;newuser&lt;/username&gt;
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>    &lt;password&gt;password&lt;/password&gt;
+<span class="linenumber"> 26</span><span class="linenumber-separator"> </span>    &lt;email&gt;newuser@example.com&lt;/email&gt;
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>    &lt;title&gt;My new weblog&lt;/title&gt;
+<span class="linenumber"> 28</span><span class="linenumber-separator"> </span>    &lt;token&gt;4615241119106240758&lt;/token&gt;
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>  &lt;/putative-user&gt;
+<span class="linenumber"> 30</span><span class="linenumber-separator"> </span>
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>&lt;/configuration&gt;
+</pre></div><div class="variablelist"><dl><dt id="configuration.4.1.1"><tt class="literal">root</tt></dt><dd><p>This is the beginning of URIs that refer to unauthenticated feeds.
+</p></dd><dt id="configuration.4.2.1"><tt class="literal">edit-root</tt></dt><dd><p>This is the beginning of URIs that refer to authenticated feeds.
+</p></dd><dt id="configuration.4.3.1"><tt class="literal">generator</tt></dt><dd><p>This is the generator string that the server will place in feeds.
+</p></dd><dt id="configuration.4.4.1"><tt class="literal">module</tt></dt><dd><p>There are four modules: post, put, format, and validate. Each module
+identifies a query module that should be run to perform the indicated method.
+The “post” and “put” methods are called for HTTP POST and PUT requests,
+respectively. The “validate” module is called for any document being added
+or updated, if it returns false the entry is rejected. The “format” module
+is called when a normal user is reading a feed, it can translate from the
+native feed format into HTML, for example.
+</p><p>If you setup different collections, each collection can have its own
+methods.</p></dd><dt id="configuration.4.5.1"><tt class="literal">weblog-reader</tt></dt><dd><p>This is the name of the weblog reader account.
+</p></dd><dt id="configuration.4.6.1"><tt class="literal">weblog-path</tt></dt><dd><p>This is the path to weblog entries. The format of URIs that point
+to weblog entries is {root}{weblog-path}{username}.
+</p></dd><dt id="configuration.4.7.1"><tt class="literal">reserved</tt></dt><dd><p>The code that allows users to add themselves to the database checks
+for reserved accounts and will refuse to allow users to add accounts with
+reserved names.
+</p></dd><dt id="configuration.4.8.1"><tt class="literal">user</tt></dt><dd><p>For each user, we store their email address and the title of their weblog.
+</p></dd><dt id="configuration.4.9.1"><tt class="literal">putative-user</tt></dt><dd><p>Putative users are ones who have done only the first half of the
+registration process. When (if?) the second half of the registration
+process is performed, we create an actual user in the security
+database using the specified password, then we can forget it here.
+</p></dd></dl></div></div><div class="section" id="testing"><div class="section-titlepage"><h3>5. Testing the install</h3></div><p>Navigate your browser to
+<a href="http://localhost:8600/">http://localhost:8600/</a>. (Or whatever host and port you
+used for the installation.) You should see a screen that looks like this:</p><div class="mediaobject"><img src="init.png" /></div><p>If you fill in the fields for “testuser” and click
+<span class="guibutton">Create</span>, the server should respond:</p><div class="mediaobject"><img src="create.png" /></div><p>Clicking on “clicking here” will close the loop and finish creating
+the account. (There's code in there for doing this by email, but it's
+commented out.)</p><p>Now if you go back to the main screen on port 8600, you'll see the user
+listed. If you point an AtomPub client at port 8601 and authenticate as
+“<tt class="literal">testuser</tt>”, you should be able to edit the feeds!</p></div></div></body></html>
