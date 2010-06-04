@@ -1,0 +1,23 @@
+body {
+  font-family: Arial,Helvetica,sans-serif;
+  width: 1024px;
+  background-image: url('/graphics/banner.png');
+  background-position: top left;
+  background-repeat: no-repeat;
+}
+
+h1 {
+  font-family: Arial,Helvetica,sans-serif;
+  color: white;
+  padding-bottom: 40px;
+  padding-top: 20px;
+  font-weight: medium;
+}
+
+ul {
+  list-style-image: url(/graphics/bullet.png);
+}
+
+li {
+  margin-bottom: 10px;
+}
