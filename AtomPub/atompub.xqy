@@ -9,10 +9,15 @@ declare namespace app="http://www.w3.org/2007/app";
 declare namespace atom="http://www.w3.org/2005/Atom";
 declare namespace mt="http://marklogic.com/xdmp/mimetypes";
 
-declare option xdmp:mapping "false"; 
+declare option xdmp:mapping "false";
 
 declare variable $DEBUG := true();
 declare variable $CONFIG := doc("/etc/configuration.xml")/mla:configuration;
+
+(: If your client has trouble with multiple collections (as Windows Live Writer appears
+   to for me), then set this to false. This turns off the media collection. :)
+declare variable $MEDIACOLLECTION := true();
+
 declare variable $binary-collection := "http://www.marklogic.com/collections/atompub/binary";
 declare variable $entry-collection := "http://www.marklogic.com/collections/atompub/atom";
 declare variable $mimetypes := xdmp:read-cluster-config-file("mimetypes.xml");
@@ -53,12 +58,23 @@ declare function atompub:service-document-uri($userid as xs:string) as xs:string
     concat($CONFIG/mla:weblog-path, $userid, "/service.xml")
 };
 
+declare function atompub:home-page-uri() as xs:string {
+  let $userid := xdmp:get-current-user()
+  return
+    atompub:home-page-uri($userid)
+};
+
+declare function atompub:home-page-uri($userid as xs:string) as xs:string {
+  (xdmp:log(concat("home page uri: ", $CONFIG/mal/weblog-path, $userid)),
+   concat($CONFIG/mla:weblog-path, $userid))
+};
+
 declare function atompub:service-document() as element(app:service)? {
   let $userid := xdmp:get-current-user()
   return
     atompub:service-document($userid)
 };
-  
+
 declare function atompub:service-document($userid as xs:string) as element(app:service)? {
   let $service-uri := atompub:service-document-uri($userid)
   return
@@ -85,22 +101,28 @@ declare function atompub:service-document($userid as xs:string) as element(app:s
 	   <accept>application/atom+xml</accept>
 	   <accept>application/atom+xml;type=entry</accept>
 	 </collection>
-	 <collection href="{concat($CONFIG/mla:edit-root,$CONFIG/mla:weblog-path,$userid, '/pictures')}">
-	   <atom:title>Weblog Pictures</atom:title>
-	   <atom:author><atom:name>{$userid}</atom:name></atom:author>
-	   <categories scheme="http://www.marklogic.com/atompub/categories/"
-	               fixed="no">
-	     <atom:category term="animal" />
-	     <atom:category term="vegatable" />
-	     <atom:category term="mineral" />
-	   </categories>
-	   <accept>application/xml</accept>
-	   <accept>application/atom+xml</accept>
-	   <accept>application/atom+xml;type=entry</accept>
-	   <accept>image/png</accept>
-	   <accept>image/jpeg</accept>
-	   <accept>image/gif</accept>
-	 </collection>
+
+         { if ($MEDIACOLLECTION)
+           then
+	     <collection href="{concat($CONFIG/mla:edit-root,$CONFIG/mla:weblog-path,$userid, '/pictures')}">
+	       <atom:title>Weblog Pictures</atom:title>
+	       <atom:author><atom:name>{$userid}</atom:name></atom:author>
+	       <categories scheme="http://www.marklogic.com/atompub/categories/"
+	                   fixed="no">
+	         <atom:category term="animal" />
+	         <atom:category term="vegatable" />
+	         <atom:category term="mineral" />
+	       </categories>
+	       <accept>application/xml</accept>
+	       <accept>application/atom+xml</accept>
+	       <accept>application/atom+xml;type=entry</accept>
+	       <accept>image/png</accept>
+	       <accept>image/jpeg</accept>
+	       <accept>image/gif</accept>
+	     </collection>
+           else
+             ()
+         }
        </workspace>
       </service>
 };
@@ -280,6 +302,7 @@ declare function atompub:_get-for-editor($uri as xs:string)
         e.g., /u/<username>/<path>/entry.atom
      3. The name of one of the user's collections in which case we want to
         return the feed for that collection, e.g., /u/<username>/pictures
+     4. The home page when there are no entries
   :)
   if ($uri = atompub:service-document-uri())
   then
@@ -305,13 +328,34 @@ declare function atompub:_get-for-editor($uri as xs:string)
 	  <mla:body>{atompub:get-member-resources($uri)}</mla:body>
 	</mla:response>
       else
-        <mla:response>
-          {atompub:debug(concat("get 404: ", $uri))}
-	  {atompub:debug(concat("for user: ", xdmp:get-current-user()))}
-  	  <mla:code>404</mla:code>
-	  <mla:message>not found</mla:message>
-	  <mla:body>{atompub:html-error(404,"not found",())}</mla:body>
-	</mla:response>
+        if ($uri = atompub:home-page-uri())
+        then
+          <mla:response>
+            {atompub:debug(concat("get home page: ", $uri))}
+            <mla:code>200</mla:code>
+            <mla:message>ok</mla:message>
+            <mla:content-type>text/html</mla:content-type>
+            <mla:body>
+              <html xmlns="http://www.w3.org/1999/xhtml">
+              <head>
+                <title>Empty</title>
+                <link rel="service" type="application/atomsvc+xml"
+                      href="{atompub:service-document-uri()}" />
+              </head>
+              <body>
+              <p>You have no entries.</p>
+              </body>
+              </html>
+            </mla:body>
+          </mla:response>
+        else
+          <mla:response>
+            {atompub:debug(concat("get 404: ", $uri))}
+	    {atompub:debug(concat("for user: ", xdmp:get-current-user()))}
+  	    <mla:code>404</mla:code>
+	    <mla:message>not found</mla:message>
+	    <mla:body>{atompub:html-error(404,"not found",())}</mla:body>
+	  </mla:response>
 };
 
 declare function atompub:_get-document($uri as xs:string)
