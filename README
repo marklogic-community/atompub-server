@@ -1,1 +1,28 @@
-See http://marklogic.github.com/atompub-server/
+The Atom Publishing Protocol is an application-level protocol for
+publishing and editing entries in an Atom Feed.
+
+The protocol's design centers around sending and receiving XML
+representations of the resources. The Atom protocol server is expected
+to maintain these collections of entries, respond to requests for
+creating, retrieving, and updating them, and manage ancillary XML
+representations that describe the services available to clients.
+
+These are all things that MarkLogic Server was designed to do.
+
+I decided to see how easy it would be to implement a fully conformant
+Atom Publishing Protocol server in XQuery on top of MarkLogic Server.
+The answer: remarkably easy. The entire implementation of the core
+server is less than 2000 lines of XQuery.
+
+This distribution includes that core implementation plus a very tiny
+weblog application designed to demonstrate how it could be used.
+
+There seems to be an unfortunate amount of variability in support for
+AtomPub clients and servers. This server seems to be conformant,
+though some clients have trouble with multiple collections, so you
+might have to turn them off.
+
+If you have any trouble, please let me know.
+
+Norman Walsh
+norman.walsh@marklogic.com

@@ -71,7 +71,14 @@ in the <em class="citetitle">MarkLogic Server Administrator's
 Guide</em>.</p></div><p>It's not possible to “amp” code that's
 run from the filesystem, so you must put the AtomPub modules in the
 servers module directory or in a a modules database.
-</p></li><li><p>Create roles. The system uses three roles: <tt class="literal">weblog-reader</tt>,
+</p></li><li><p>Create roles and users, setup a database, setup two application servers,
+setup “amps” for two AtomPub functions, and initialize the database with global
+configuration information.</p><p>All of this can be accomplished by running
+<tt class="filename">setup/atompub-setup.xqy</tt> as an administrative user.
+(I do this by pasting it into a
+<a href="http://developer.marklogic.com/code/cq">CQ</a> buffer
+and evaluating it.)
+</p></li></ol></div><div class="sidebar"><div class="title">Installation by hand</div><div class="sidebar-content"><p>If you would prefer to perform these steps by hand, you must:</p><div class="orderedlist"><ol style="list-style: decimal;"><li><p>Create roles. The system uses three roles: <tt class="literal">weblog-reader</tt>,
 <tt class="literal">weblog-editor</tt>, and <tt class="literal">weblog-admin</tt>. These
 roles exist mostly with an eye towards future extension, there isn't that
 much difference between them today.
@@ -81,8 +88,7 @@ execute privileges: <tt class="literal">unprotected-collections</tt>,
 <tt class="literal">xdmp:invoke</tt>. It must also have the
 <tt class="literal">filesystem-access (read)</tt> capability.</p><p>The <tt class="literal">weblog-editor</tt> must inherit the
 <tt class="literal">weblog-reader</tt> role.</p><p>The <tt class="literal">weblog-admin</tt> must inherit the
-<tt class="literal">weblog-reader</tt> role and have the
-<tt class="literal">unprotected-uri</tt> execute privilege.
+<tt class="literal">weblog-reader</tt>.
 </p></li><li><p>Create users. You need to create two users, the rest will be created
 automatically.</p><p>Create <tt class="literal">joepublic</tt> with the
 <tt class="literal">weblog-reader</tt> role. This is the
@@ -90,13 +96,13 @@ user that will be used to access the unauthenticated, “read only”
 server.</p><p>Create <tt class="literal">weblog-admin</tt> with the
 <tt class="literal">weblog-admin</tt> role.</p></li><li><p>Create a “<tt class="literal">weblog</tt>” forest and
 “<tt class="literal">weblog</tt>” database to hold the
-feeds.</p></li><li><p>Create the public appserver on port 8600.</p><p>Specify the “<tt class="literal">atompub</tt>” database as the
+feeds.</p></li><li><p>Create the public appserver on port 8600.</p><p>Specify the “<tt class="literal">weblog</tt>” database as the
 database, the location where you installed the
 “<tt class="filename">WebLog</tt>” directory as the root, use
 “<tt class="literal">application-level</tt>” authentication with
 “<tt class="literal">joepublic</tt> as the default user.
 Specify <tt class="filename">/error-handler.xqy</tt> as the error
-handler.</p></li><li><p>Create the authenticated appserver on port 8601.</p><p>Specify the “<tt class="literal">atompub</tt>” database as the
+handler.</p></li><li><p>Create the authenticated appserver on port 8601.</p><p>Specify the “<tt class="literal">weblog</tt>” database as the
 database, the location where you installed the
 “<tt class="filename">WebLog</tt>” directory as the root, use
 “<tt class="literal">basic</tt>” authentication (or any scheme that your
@@ -110,13 +116,29 @@ and have the document uri <tt class="uri">/AtomPub/admin.xqy</tt>.
 </p><p>For convenience, just give them the “<tt class="literal">admin</tt>”
 role. It would be possible to give them something more constrained in
 production, but this is the easiest thing to do for testing.</p></li><li><p>Initialize the database with global configuration information.
-</p><p>If you deviated from the instructions above, used different user names
-or different ports, for example, then make sure you edit
-<tt class="filename">/WebLog/setup/load-config.xqy</tt> before you run it!</p><p>When you're ready, log into the web server as
-<tt class="literal">weblog-admin</tt> and run
-<tt class="uri">/setup/load-config.xqy</tt>. This will setup some default
-values.</p></li></ol></div></div><div class="section" id="configuration"><div class="section-titlepage"><h3>4. Configuration</h3></div><p>Global configuration information for the repository is stored in
-<tt class="uri">/etc/configuration.xml</tt>. Here's what the default looks like:</p><div class="programlisting"><pre><span class="linenumber">  1</span><span class="linenumber-separator"> </span>
+</p><p>Insert the following document into the database at the URI
+<tt class="uri">/etc/configuration.xml</tt>:</p><div class="programlisting"><pre><span class="linenumber">  1</span><span class="linenumber-separator"> </span>&lt;configuration xmlns="http://www.marklogic.com/ns/atompub"&gt;
+<span class="linenumber">  2</span><span class="linenumber-separator"> </span>  &lt;root&gt;http://localhost:8600&lt;/root&gt;
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>  &lt;edit-root&gt;http://localhost:8601&lt;/edit-root&gt;
+<span class="linenumber">  4</span><span class="linenumber-separator"> </span>  &lt;generator&gt;Mark Logic AtomPub V0.5&lt;/generator&gt;
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>  &lt;module method="post"&gt;/AtomPub/post.xqy&lt;/module&gt;
+<span class="linenumber">  6</span><span class="linenumber-separator"> </span>  &lt;module method="put"&gt;/AtomPub/put.xqy&lt;/module&gt;
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>  &lt;module method="validate"&gt;/AtomPub/validate.xqy&lt;/module&gt;
+<span class="linenumber">  8</span><span class="linenumber-separator"> </span>  &lt;module method="format"&gt;/AtomPub/format.xqy&lt;/module&gt;
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>  &lt;weblog-reader&gt;joepublic&lt;/weblog-reader&gt;
+<span class="linenumber"> 10</span><span class="linenumber-separator"> </span>  &lt;weblog-path&gt;/u/&lt;/weblog-path&gt;
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>
+<span class="linenumber"> 12</span><span class="linenumber-separator"> </span>  &lt;reserved userid="admin"/&gt;
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>  &lt;reserved userid="weblog-admin"/&gt;
+<span class="linenumber"> 14</span><span class="linenumber-separator"> </span>
+<span class="linenumber">   </span><span class="linenumber-separator"> </span>&lt;/configuration&gt;
+</pre></div><p>If you deviated from the instructions above, used different user names
+or different ports, for example, then make sure you edit the file appropriately.
+</p><p>Make sure that the <tt class="uri">/etc/configuration.xml</tt> file grants
+“read” permission to “weblog-reader” and “update” permission to “weblog-editor”.
+</p></li></ol></div></div></div></div><div class="section" id="configuration"><div class="section-titlepage"><h3>4. Configuration</h3></div><p>Global configuration information for the repository is stored in
+<tt class="uri">/etc/configuration.xml</tt>. Here's what it might look like after
+a single user has been added.</p><div class="programlisting"><pre><span class="linenumber">  1</span><span class="linenumber-separator"> </span>
 <span class="linenumber">  2</span><span class="linenumber-separator"> </span>&lt;configuration xmlns="http://www.marklogic.com/ns/atompub"
 <span class="linenumber">   </span><span class="linenumber-separator"> </span>               xmlns:app="http://www.w3.org/2007/app"
 <span class="linenumber">  4</span><span class="linenumber-separator"> </span>   	    xmlns:atom="http://www.w3.org/2005/Atom"&gt;

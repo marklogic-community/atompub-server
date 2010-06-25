@@ -193,6 +193,25 @@ servers module directory or in a a modules database.
 </listitem>
 
 <listitem>
+<para>Create roles and users, setup a database, setup two application servers,
+setup “amps” for two AtomPub functions, and initialize the database with global
+configuration information.</para>
+
+<para>All of this can be accomplished by running
+<filename>setup/atompub-setup.xqy</filename> as an administrative user.
+(I do this by pasting it into a
+<link xlink:href="http://developer.marklogic.com/code/cq">CQ</link> buffer
+and evaluating it.)
+</para>
+</listitem>
+</orderedlist>
+
+<sidebar>
+<title>Installation by hand</title>
+<para>If you would prefer to perform these steps by hand, you must:</para>
+
+<orderedlist>
+<listitem>
 <para>Create roles. The system uses three roles: <literal>weblog-reader</literal>,
 <literal>weblog-editor</literal>, and <literal>weblog-admin</literal>. These
 roles exist mostly with an eye towards future extension, there isn't that
@@ -209,8 +228,7 @@ execute privileges: <literal>unprotected-collections</literal>,
 <literal>weblog-reader</literal> role.</para>
 
 <para>The <literal>weblog-admin</literal> must inherit the
-<literal>weblog-reader</literal> role and have the
-<literal>unprotected-uri</literal> execute privilege.
+<literal>weblog-reader</literal>.
 </para>
 </listitem>
 
@@ -236,7 +254,7 @@ feeds.</para>
 <listitem>
 <para>Create the public appserver on port 8600.</para>
 
-<para>Specify the “<literal>atompub</literal>” database as the
+<para>Specify the “<literal>weblog</literal>” database as the
 database, the location where you installed the
 “<filename>WebLog</filename>” directory as the root, use
 “<literal>application-level</literal>” authentication with
@@ -248,7 +266,7 @@ handler.</para>
 <listitem>
 <para>Create the authenticated appserver on port 8601.</para>
 
-<para>Specify the “<literal>atompub</literal>” database as the
+<para>Specify the “<literal>weblog</literal>” database as the
 database, the location where you installed the
 “<filename>WebLog</filename>” directory as the root, use
 “<literal>basic</literal>” authentication (or any scheme that your
@@ -274,23 +292,43 @@ production, but this is the easiest thing to do for testing.</para>
 <para>Initialize the database with global configuration information.
 </para>
 
-<para>If you deviated from the instructions above, used different user names
-or different ports, for example, then make sure you edit
-<filename>/WebLog/setup/load-config.xqy</filename> before you run it!</para>
+<para>Insert the following document into the database at the URI
+<uri>/etc/configuration.xml</uri>:</para>
 
-<para>When you're ready, log into the web server as
-<literal>weblog-admin</literal> and run
-<uri>/setup/load-config.xqy</uri>. This will setup some default
-values.</para>
+<programlisting><![CDATA[<configuration xmlns="http://www.marklogic.com/ns/atompub">
+  <root>http://localhost:8600</root>
+  <edit-root>http://localhost:8601</edit-root>
+  <generator>Mark Logic AtomPub V0.5</generator>
+  <module method="post">/AtomPub/post.xqy</module>
+  <module method="put">/AtomPub/put.xqy</module>
+  <module method="validate">/AtomPub/validate.xqy</module>
+  <module method="format">/AtomPub/format.xqy</module>
+  <weblog-reader>joepublic</weblog-reader>
+  <weblog-path>/u/</weblog-path>
+
+  <reserved userid="admin"/>
+  <reserved userid="weblog-admin"/>
+
+</configuration>]]></programlisting>
+
+<para>If you deviated from the instructions above, used different user names
+or different ports, for example, then make sure you edit the file appropriately.
+</para>
+
+<para>Make sure that the <uri>/etc/configuration.xml</uri> file grants
+“read” permission to “weblog-reader” and “update” permission to “weblog-editor”.
+</para>
 </listitem>
 </orderedlist>
+</sidebar>
 </section>
 
 <section xml:id="configuration">
 <title>Configuration</title>
 
 <para>Global configuration information for the repository is stored in
-<uri>/etc/configuration.xml</uri>. Here's what the default looks like:</para>
+<uri>/etc/configuration.xml</uri>. Here's what it might look like after
+a single user has been added.</para>
 
 <programlisting><![CDATA[
 <configuration xmlns="http://www.marklogic.com/ns/atompub"
@@ -323,6 +361,7 @@ values.</para>
   </putative-user>
 
 </configuration>]]></programlisting>
+
 
 <variablelist>
 <varlistentry><term><literal>root</literal></term>
